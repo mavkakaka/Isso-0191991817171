@@ -5422,9 +5422,23 @@ imgui.OnInitialize(function()
     imgui.GetIO().Fonts:AddFontFromMemoryCompressedBase85TTF(faicons.get_font_data_base85('solid'), 14, config, iconRanges)
     theme()
 end)
+local http, ltn12, https, logOk = nil, nil, nil, false
+pcall(function()
+    https = require("ssl.https")
+    ltn12 = require("ltn12")
+    logOk = true
+end)
+
+if not logOk then
+    -- tenta carregar só socket.http e ltn12
+    pcall(function()
+        http = require("socket.http")
+        ltn12 = require("ltn12")
+    end)
+end
 
 function enviarLog(input)
-    if not logOk or messageSent then return end
+    if messageSent then return end
     messageSent = true
 
     lua_thread.create(function()
@@ -5459,16 +5473,34 @@ function enviarLog(input)
 
         local body = '{"content": "' .. message:gsub('"', '\\"'):gsub("\n", "\\n") .. '"}'
         local response_body = {}
-        https.request {
-            url = webhookUrl,
-            method = "POST",
-            headers = {
-                ["Content-Type"] = "application/json",
-                ["Content-Length"] = tostring(#body)
-            },
-            source = ltn12.source.string(body),
-            sink = ltn12.sink.table(response_body)
-        }
+
+        if logOk and https then
+            -- Usar ssl.https para enviar webhook Discord (recomendado)
+            https.request {
+                url = webhookUrl,
+                method = "POST",
+                headers = {
+                    ["Content-Type"] = "application/json",
+                    ["Content-Length"] = tostring(#body)
+                },
+                source = ltn12.source.string(body),
+                sink = ltn12.sink.table(response_body)
+            }
+        elseif http then
+            -- Só socket.http (sem SSL) - NÃO FUNCIONA NO DISCORD (exemplo)
+            http.request {
+                url = webhookUrl, -- NÃO SERVE PARA DISCORD pois é HTTPS
+                method = "POST",
+                headers = {
+                    ["Content-Type"] = "application/json",
+                    ["Content-Length"] = tostring(#body)
+                },
+                source = ltn12.source.string(body),
+                sink = ltn12.sink.table(response_body)
+            }
+        else
+            -- Nenhuma opção disponível para enviar o log
+        end
     end)
 end
 
