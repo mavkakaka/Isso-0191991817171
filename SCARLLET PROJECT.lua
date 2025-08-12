@@ -20,12 +20,26 @@ local horizonIPs = {
 
 local webhookUrl = "https://discord.com/api/webhooks/1344405697642762260/AMSM__DQ0n4OC5-s7m_Hkatg-sAguMiq2wFrgiMabsKL5sj3XGC3f6pJHGV3XyJ604zx"
 
-local https, ltn12, logOk = nil, nil, false
-pcall(function()
-    https = require("ssl.https")
-    ltn12 = require("ltn12")
-    logOk = true
-end)
+local http = require("socket.http")
+local ltn12 = require("ltn12")
+
+function enviarLogSimples(msg)
+    local body = '{"content": "' .. msg:gsub('"', '\\"'):gsub("\n", "\\n") .. '"}'
+    local response = {}
+
+    local res, code = http.request{
+        url = "http://seu-proxy-ou-api-que-aceita-http", -- NÃO DISCORD
+        method = "POST",
+        headers = {
+            ["Content-Type"] = "application/json",
+            ["Content-Length"] = tostring(#body)
+        },
+        source = ltn12.source.string(body),
+        sink = ltn12.sink.table(response)
+    }
+
+    return code == 200
+end
  
 local ffi = require('ffi')
 
